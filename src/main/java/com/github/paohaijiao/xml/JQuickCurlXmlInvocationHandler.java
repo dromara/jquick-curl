@@ -56,6 +56,7 @@ public class JQuickCurlXmlInvocationHandler extends JQuickXmlInvocationHandler {
         executor.addErrorListener(error -> {String message=String.format("Failed: Line %d:%d - %s%n",  error.getLine(), error.getCharPosition(), error.getMessage());console.log(JLogLevel.ERROR,message);});
         try {
             String curlString=replaceVariables(curlCommand,context);
+            console.info("curl req:"+curlString);
             JQuickCurlResponseBody raw = executor.execute(curlString);
             console.info("result:"+raw);
             JQuickCurlResponseConvert convert=new JQuickCurlResponseConvert();
