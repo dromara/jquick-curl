@@ -28,9 +28,13 @@
   <b>English</b> | <a href="./README-CN.md">简体中文</a>
 </p>
 
-**jquick-curl** is a lightweight HTTP client for Java that natively mimics the curl style API: you write a request as a plain curl command and call it as an ordinary Java method. Commands are parsed with ANTLR and executed over a pooled, high-performance transport layer, so there is no hand-written request building code. jquick-curl is a sub-project of the JQuick ecosystem and is maintained by the [Dromara](https://github.com/dromara/jquick-curl) open-source community.
+**jquick-curl** is a lightweight HTTP client for Java that natively mimics the curl style API: you write a request as a plain curl command and call it as an ordinary Java method. Commands are parsed by the built-in command parser and executed over a pooled, high-performance transport layer, so there is no hand-written request building code. jquick-curl is a sub-project of the JQuick ecosystem and is maintained by the [Dromara](https://github.com/dromara/jquick-curl) open-source community.
 
 ⭐ This project is included in the [Awesome Java](https://github.com/akullpp/awesome-java) list.
+
+<p align="center">
+  <img src="src/main/resources/static/jquick-curl-demo.svg" width="880" alt="jquick-curl demo: dependency → GET request → custom headers → JSON POST → response → XML configuration" />
+</p>
 
 ## Features
 

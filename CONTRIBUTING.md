@@ -98,7 +98,7 @@ jquick-curl/
 │   │   │   ├── handler/        # 处理器
 │   │   │   ├── interceptor/    # 拦截器
 │   │   │   ├── model/          # 数据模型
-│   │   │   ├── parser/         # 解析器（ANTLR）
+│   │   │   ├── parser/         # 命令解析器
 │   │   │   ├── result/         # 结果处理
 │   │   │   ├── support/        # 支持类
 │   │   │   ├── util/           # 工具类

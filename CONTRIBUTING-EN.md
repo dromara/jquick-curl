@@ -98,7 +98,7 @@ jquick-curl/
 │   │   │   ├── handler/        # Handlers
 │   │   │   ├── interceptor/    # Interceptors
 │   │   │   ├── model/          # Data models
-│   │   │   ├── parser/         # Parsers (ANTLR)
+│   │   │   ├── parser/         # Command parsers
 │   │   │   ├── result/         # Result processing
 │   │   │   ├── support/        # Support classes
 │   │   │   ├── util/           # Utility classes

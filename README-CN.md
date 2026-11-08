@@ -28,19 +28,23 @@
   <a href="./README.md">English</a> | <b>简体中文</b>
 </p>
 
-**jquick-curl** 是一款面向 Java 的轻量 HTTP 客户端，原生模仿 curl 风格 API：把一条普通的 curl 命令写成 Java 方法即可发起请求。命令由 ANTLR 解析，并通过带连接池的高性能传输层执行，因此无需手写任何请求构建代码。jquick-curl 是 JQuick 生态的子项目，由 [Dromara](https://github.com/dromara/jquick-curl) 开源社区维护。
+**jquick-curl** 是一款面向 Java 的轻量 HTTP 客户端。用一条熟悉的 curl 命令描述请求，把它写在注解或 XML 里，就能像调用普通 Java 方法一样发起调用：自研命令解析器负责把命令翻译成请求，带连接池的高性能传输层负责执行，业务代码里没有手写的请求构建逻辑。jquick-curl 是 JQuick 生态的子项目，由 [Dromara](https://github.com/dromara/jquick-curl) 开源社区维护。
 
 ⭐ 本项目已被 [Awesome Java](https://github.com/akullpp/awesome-java) 列表收录。
 
+<p align="center">
+  <img src="src/main/resources/static/jquick-curl-demo.svg" width="880" alt="jquick-curl 演示：引入依赖 → GET 请求 → 自定义请求头 → JSON POST → 响应报文 → XML 配置" />
+</p>
+
 ## 特性
 
-- **原生 curl 风格 API** —— 用 curl 命令描述请求，用 Java 方法调用。
+- **原生 curl 风格 API** —— 用 curl 命令描述请求，用 Java 方法调用，后端开发者零学习成本。
 - **注解与 XML 双配置** —— 使用 `@JCurlCommand` 声明请求，或集中维护在 `apis.xml` 中。
 - **动态代理客户端** —— `JCurlInvoker.createProxy(UserApi.class)` 把接口变成可用的客户端。
 - **变量替换** —— 运行时从请求中解析 `${name}` / `#{name}` 占位符。
 - **条件渲染** —— 仅当 XML 中的 `<if test="...">` 表达式成立时，才拼入对应的 header 或选项。
 - **Cookie 支持** —— 手动设置 cookie、基于文件的 cookie 存储、`Set-Cookie` 持久化。
-- **HTTP 方法** —— `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`HEAD`、`OPTIONS`、`TRACE`。
+- **全量 HTTP 方法** —— `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`HEAD`、`OPTIONS`、`TRACE`。
 - **文件传输** —— 通过 `-F` 做 multipart 上传，通过 `-o` / `--output` 下载。
 - **批量执行** —— 一次调用执行类中所有 `@JCurlCommand` 方法。
 - **超时、重试、重定向与连接池** —— 通过 `JQuickCurlConfig` 统一配置。
@@ -49,7 +53,7 @@
 
 ## 快速开始
 
-### 1. Maven 依赖
+### 1. 引入依赖
 
 ```xml
 <dependency>
@@ -59,23 +63,24 @@
 </dependency>
 ```
 
-### 2. 基础 GET 请求
+### 2. 发起 GET 请求
 
-在接口方法上声明 curl 命令，然后创建代理并调用即可。
+在接口方法上声明 curl 命令，创建代理后直接调用。
 
 ```java
 import com.github.paohaijiao.anno.JCurlCommand;
 import com.github.paohaijiao.domain.req.JQuickCurlReq;
 import com.github.paohaijiao.executor.JCurlInvoker;
 
-public interface UserApi {
+public class Demo {
 
-    // GET request: returns the response body as a String
-    @JCurlCommand("curl -X GET https://httpbin.org/get")
-    String list(JQuickCurlReq request);
-}
+    interface UserApi {
 
-class GetDemo {
+        // GET 请求：返回体直接映射为 String
+        @JCurlCommand("curl -X GET https://httpbin.org/get")
+        String list(JQuickCurlReq request);
+    }
+
     public static void main(String[] args) throws Exception {
         UserApi api = JCurlInvoker.createProxy(UserApi.class);
         String body = api.list(new JQuickCurlReq());
@@ -84,16 +89,26 @@ class GetDemo {
 }
 ```
 
-### 3. 基础 POST 请求
+### 3. 追加自定义请求头
+
+curl 的选项可以原样拼进命令字符串，例如 `-H` 追加请求头：
 
 ```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
+public interface UserApi {
 
+    @JCurlCommand("curl -X GET https://httpbin.org/get " +
+            "-H 'X-Request-Id: 8f2c1d'")
+    String list(JQuickCurlReq request);
+}
+```
+
+### 4. 发送 JSON POST 请求
+
+`-H` 指定 `Content-Type`，`-d` 携带 JSON 报文：
+
+```java
 public interface OrderApi {
 
-    // POST request with a JSON body
     @JCurlCommand("curl -X POST https://httpbin.org/post " +
             "-H 'Content-Type: application/json' " +
             "-d '{\"sku\":\"A-1001\",\"count\":2}'")
@@ -103,73 +118,14 @@ public interface OrderApi {
 class PostDemo {
     public static void main(String[] args) throws Exception {
         OrderApi api = JCurlInvoker.createProxy(OrderApi.class);
-        String body = api.create(new JQuickCurlReq());
-        System.out.println(body);
+        System.out.println(api.create(new JQuickCurlReq()));
     }
 }
 ```
 
-### 4. Cookie 完整用法
+### 5. 读取响应报文与响应头
 
-jquick-curl 实现了原生 curl 的 cookie 选项：使用 `-b` / `--cookie` 发送 cookie，使用 `-c` / `--cookie-jar` 持久化 cookie。所有 cookie 会合并进同一个 `Cookie` 请求头，响应中的每个 `Set-Cookie` 都可以写入 Netscape 格式的 cookie 文件，该文件即充当持久化的 cookie 存储（CookieStore）。
-
-#### 4.1 手动设置单个 Cookie
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-
-public interface CookieApi {
-
-    // Single cookie: -b / --cookie 'name=value'
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b 'sessionId=abc123'")
-    String withSingleCookie(JQuickCurlReq request);
-}
-
-class SingleCookieDemo {
-    public static void main(String[] args) throws Exception {
-        CookieApi api = JCurlInvoker.createProxy(CookieApi.class);
-        System.out.println(api.withSingleCookie(new JQuickCurlReq()));
-    }
-}
-```
-
-#### 4.2 手动设置多个 Cookie
-
-```java
-public interface CookieApi {
-
-    // Multiple cookies: separate them with a semicolon inside one -b option
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
-            "-b 'sessionId=abc123; theme=dark; lang=en'")
-    String withMultipleCookies(JQuickCurlReq request);
-
-    // Equivalent form: set the Cookie header directly with -H
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
-            "-H 'Cookie: sessionId=abc123; theme=dark; lang=en'")
-    String withCookieHeader(JQuickCurlReq request);
-}
-```
-
-多个 cookie 之间用 `;` 分隔。`-b` 与 `-H 'Cookie: ...'` 最终都会写入同一个 `Cookie` 请求头，同名 cookie 会合并而不是直接覆盖。
-
-#### 4.3 从 cookie 文件自动携带 Cookie
-
-```java
-public interface CookieApi {
-
-    // Load cookies from a Netscape / Mozilla cookie file: -b @file
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
-    String withJarFile(JQuickCurlReq request);
-}
-```
-
-`-b @cookies.txt` 会读取 Netscape 格式的 cookie 文件并自动附加到请求，这是 jquick-curl 跨请求保持 cookie 的方式。注意文件名前需要加 `@` 前缀。
-
-#### 4.4 从响应中提取 Set-Cookie
-
-需要读取响应头时，把返回类型声明为 `JQuickCurlResponseBody` 而不是 `String`。
+需要读取响应头或复用响应体时，把返回类型声明为 `JQuickCurlResponseBody`，响应可以多次读取：
 
 ```java
 import com.github.paohaijiao.anno.JCurlCommand;
@@ -177,77 +133,31 @@ import com.github.paohaijiao.domain.req.JQuickCurlReq;
 import com.github.paohaijiao.executor.JCurlInvoker;
 import com.github.paohaijiao.responseBody.JQuickCurlResponseBody;
 
-import java.util.List;
+public class RespDemo {
 
-public interface LoginApi {
+    interface LoginApi {
 
-    // Return the raw response body object to access headers
-    @JCurlCommand("curl -X GET 'https://httpbin.org/cookies/set?sessionId=abc123'")
-    JQuickCurlResponseBody setCookie(JQuickCurlReq request);
-}
+        @JCurlCommand("curl -X GET 'https://httpbin.org/cookies/set?sessionId=abc123'")
+        JQuickCurlResponseBody setCookie(JQuickCurlReq request);
+    }
 
-class ReadSetCookieDemo {
     public static void main(String[] args) throws Exception {
         LoginApi api = JCurlInvoker.createProxy(LoginApi.class);
         JQuickCurlResponseBody response = api.setCookie(new JQuickCurlReq());
 
-        // First Set-Cookie header
+        // 响应头与响应体
         String first = response.header("Set-Cookie");
-        // All Set-Cookie headers (redirects may return several)
-        List<String> all = response.headers("Set-Cookie");
-        // Response payload
         String body = response.asString();
 
         System.out.println(first);
-        System.out.println(all);
         System.out.println(body);
     }
 }
 ```
 
-#### 4.5 Cookie 持久化与登录态复用
+### 6. XML 配置方式
 
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-import com.github.paohaijiao.responseBody.JQuickCurlResponseBody;
-
-public interface SessionApi {
-
-    // Step 1: sign in and save every Set-Cookie into cookies.txt (-c / --cookie-jar)
-    @JCurlCommand("curl -X POST https://httpbin.org/post " +
-            "-H 'Content-Type: application/json' " +
-            "-d '{\"user\":\"ada\",\"password\":\"secret\"}' " +
-            "-c ./cookies.txt")
-    JQuickCurlResponseBody login(JQuickCurlReq request);
-
-    // Step 2: reuse the persisted cookies on the next request (-b @file)
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
-    String profile(JQuickCurlReq request);
-}
-
-class SessionDemo {
-    public static void main(String[] args) throws Exception {
-        SessionApi api = JCurlInvoker.createProxy(SessionApi.class);
-        JQuickCurlReq request = new JQuickCurlReq();
-
-        // Writes ./cookies.txt in Netscape format
-        api.login(request);
-
-        // Cookies from the file are attached automatically
-        System.out.println(api.profile(request));
-    }
-}
-```
-
-`-c` / `--cookie-jar` 会把每个 `Set-Cookie` 以 Netscape 格式（制表符分隔的 7 列）写入指定文件，后续请求用 `-b @文件` 复用，即可在多次调用之间保持登录态。请勿把真实的 cookie 文件提交到代码仓库。
-
-## 更多示例
-
-### XML 配置
-
-把接口定义集中到 XML 中，让请求模板与 Java 业务代码彻底分离。
+把接口定义集中到 `apis.xml`，让请求模板与 Java 业务代码彻底分离：
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -283,12 +193,68 @@ class XmlDemo {
 
 `<curl name="...">` 的属性值必须与 Java 方法名一致，`#{name}` 是 XML 代理使用的变量占位符。
 
+## 场景示例
+
+### Cookie 与会话保持
+
+jquick-curl 实现了原生 curl 的 cookie 选项：`-b` / `--cookie` 发送 cookie，`-c` / `--cookie-jar` 持久化 cookie。所有 cookie 会合并进同一个 `Cookie` 请求头，响应中的每个 `Set-Cookie` 都可以写入 Netscape 格式的 cookie 文件，该文件即充当持久化的 cookie 存储（CookieStore）。
+
+```java
+public interface CookieApi {
+
+    // 手动设置：-b / --cookie，多个 cookie 用 ; 分隔
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
+            "-b 'sessionId=abc123; theme=dark; lang=en'")
+    String withCookies(JQuickCurlReq request);
+
+    // 等价写法：直接设置 Cookie 请求头
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
+            "-H 'Cookie: sessionId=abc123; theme=dark; lang=en'")
+    String withCookieHeader(JQuickCurlReq request);
+
+    // 从 Netscape cookie 文件加载：-b @file（注意 @ 前缀）
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
+    String withJarFile(JQuickCurlReq request);
+}
+```
+
+`-b` 与 `-H 'Cookie: ...'` 最终都会写入同一个 `Cookie` 请求头，同名 cookie 会合并而不是直接覆盖。
+
+登录态复用的典型两步：先登录并落盘 cookie，再携带 cookie 访问受保护接口。
+
+```java
+public interface SessionApi {
+
+    // 第一步：登录，并把每个 Set-Cookie 写入 cookies.txt（-c / --cookie-jar）
+    @JCurlCommand("curl -X POST https://httpbin.org/post " +
+            "-H 'Content-Type: application/json' " +
+            "-d '{\"user\":\"ada\",\"password\":\"secret\"}' " +
+            "-c ./cookies.txt")
+    JQuickCurlResponseBody login(JQuickCurlReq request);
+
+    // 第二步：下一条请求自动携带文件中的 cookie（-b @file）
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
+    String profile(JQuickCurlReq request);
+}
+
+class SessionDemo {
+    public static void main(String[] args) throws Exception {
+        SessionApi api = JCurlInvoker.createProxy(SessionApi.class);
+        JQuickCurlReq request = new JQuickCurlReq();
+        api.login(request);
+        System.out.println(api.profile(request));
+    }
+}
+```
+
+`-c` / `--cookie-jar` 会把每个 `Set-Cookie` 以 Netscape 格式（制表符分隔的 7 列）写入指定文件。请勿把真实的 cookie 文件提交到代码仓库。
+
 ### 变量替换与条件渲染
 
 ```java
 public interface AuthApi {
 
-    // ${...} placeholders are resolved from JQuickCurlReq
+    // ${...} 占位符由 JQuickCurlReq 在运行时解析
     @JCurlCommand("curl -X GET https://api.example.com/me -u ${user}:${password}")
     String currentUser(JQuickCurlReq request);
 }
@@ -315,16 +281,16 @@ String me = JCurlInvoker.createProxy(AuthApi.class).currentUser(request);
 ```java
 public interface FileApi {
 
-    // Multipart upload: -F 'file=@/path/to/file'
+    // Multipart 上传：-F 'file=@/path/to/file'
     @JCurlCommand("curl -X POST https://api.example.com/files -F 'file=@./report.pdf'")
     String upload(JQuickCurlReq request);
 
-    // Upload a file together with normal form fields
+    // 文件与普通表单字段混传
     @JCurlCommand("curl -X POST https://api.example.com/import " +
             "-F 'userId=1001' -F 'file=@./report.pdf'")
     String uploadWithForm(JQuickCurlReq request);
 
-    // Download: -o / --output writes the response bytes to a local file
+    // 下载：-o / --output 把响应字节直接写入本地文件
     @JCurlCommand("curl -X GET https://api.example.com/files/report.pdf --output './download/report.pdf'")
     byte[] download(JQuickCurlReq request);
 }
@@ -384,7 +350,7 @@ JQuickCurlConfig.getInstance()
 ```
 
 ```java
-// Add a global interceptor, for example a Bearer token
+// 全局拦截器，例如统一注入 Bearer Token
 Interceptor auth = chain -> chain.proceed(
         chain.request().newBuilder()
                 .addHeader("Authorization", "Bearer " + System.getenv("API_TOKEN"))
@@ -395,7 +361,7 @@ JQuickCurlConfig.getInstance().addInterceptor(auth);
 
 `JQuickCurlConfig` 是全局单例配置，统一管理超时、连接池、重试、重定向与拦截器；单个方法的超时可用 `@JTimeout` 覆盖。
 
-### 已支持的 curl 选项
+## 已支持的 curl 选项
 
 | 类别 | 支持的写法 | 用途 |
 | --- | --- | --- |
