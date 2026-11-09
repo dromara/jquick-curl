@@ -28,23 +28,24 @@
   <b>English</b> | <a href="./README-CN.md">简体中文</a>
 </p>
 
-**jquick-curl** is a lightweight HTTP client for Java that natively mimics the curl style API: you write a request as a plain curl command and call it as an ordinary Java method. Commands are parsed by the built-in command parser and executed over a pooled, high-performance transport layer, so there is no hand-written request building code. jquick-curl is a sub-project of the JQuick ecosystem and is maintained by the [Dromara](https://github.com/dromara/jquick-curl) open-source community.
+**jquick-curl** is a lightweight HTTP client for Java. You describe each request as a plain curl command, keep all templates in one XML file, and the Java side stays a plain interface without a single annotation: the built-in command parser turns commands into requests, and a pooled, high-performance transport layer executes them — no hand-written request building code anywhere. jquick-curl is a sub-project of the JQuick ecosystem and is maintained by the [Dromara](https://github.com/dromara/jquick-curl) open-source community.
 
 ⭐ This project is included in the [Awesome Java](https://github.com/akullpp/awesome-java) list.
 
 <p align="center">
-  <img src="src/main/resources/static/jquick-curl-demo.svg" width="880" alt="jquick-curl demo: dependency → GET request → custom headers → JSON POST → response → XML configuration" />
+  <img src="src/main/resources/static/jquick-curl-demo.svg" width="880" alt="jquick-curl demo: curl commands in XML → variable substitution → if conditions → JSON POST → response → annotation-free Java interface" />
 </p>
 
 ## Features
 
-- **Native curl style API** — describe a request with a curl command, call it with a Java method.
-- **Annotation and XML configuration** — declare requests with `@JCurlCommand` or centralize them in `apis.xml`.
-- **Dynamic proxy clients** — `JCurlInvoker.createProxy(UserApi.class)` turns an interface into a working client.
-- **Variable substitution** — resolve `${name}` / `#{name}` placeholders from the request at runtime.
-- **Conditional rendering** — render headers or options only when an XML `<if test="...">` expression is true.
+- **Centralized XML configuration** — every request template lives in `apis.xml`; change configuration, not Java code.
+- **Native curl style** — describe requests as curl commands, zero learning cost for backend developers.
+- **Annotation-free interfaces** — the Java side is a plain interface; `factory.createApi(UserApi.class)` turns it into a client.
+- **Variable substitution** — `#{name}` / `${name}` placeholders resolved at runtime.
+- **Conditional rendering** — options are only spliced into the command when an `<if test="...">` expression is true.
+- **Optional annotations** — or declare commands directly with `@JCurlCommand` on interface methods.
 - **Cookie support** — manual cookies, a file-backed cookie jar, and `Set-Cookie` persistence.
-- **HTTP methods** — `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, `TRACE`.
+- **Full HTTP method coverage** — `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, `TRACE`.
 - **File transfer** — multipart upload with `-F` and download with `-o` / `--output`.
 - **Batch execution** — run every `@JCurlCommand` method of a class in a single call.
 - **Timeouts, retries, redirects and connection pooling** — configured once through `JQuickCurlConfig`.
@@ -63,195 +64,9 @@
 </dependency>
 ```
 
-### 2. Basic GET
+### 2. Define a GET request in XML
 
-Declare the curl command on an interface method, then create a proxy and call it.
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-
-public interface UserApi {
-
-    // GET request: returns the response body as a String
-    @JCurlCommand("curl -X GET https://httpbin.org/get")
-    String list(JQuickCurlReq request);
-}
-
-class GetDemo {
-    public static void main(String[] args) throws Exception {
-        UserApi api = JCurlInvoker.createProxy(UserApi.class);
-        String body = api.list(new JQuickCurlReq());
-        System.out.println(body);
-    }
-}
-```
-
-### 3. Basic POST
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-
-public interface OrderApi {
-
-    // POST request with a JSON body
-    @JCurlCommand("curl -X POST https://httpbin.org/post " +
-            "-H 'Content-Type: application/json' " +
-            "-d '{\"sku\":\"A-1001\",\"count\":2}'")
-    String create(JQuickCurlReq request);
-}
-
-class PostDemo {
-    public static void main(String[] args) throws Exception {
-        OrderApi api = JCurlInvoker.createProxy(OrderApi.class);
-        String body = api.create(new JQuickCurlReq());
-        System.out.println(body);
-    }
-}
-```
-
-### 4. Cookie usage
-
-jquick-curl implements the cookie options of native curl: `-b` / `--cookie` for sending cookies and `-c` / `--cookie-jar` for persisting them. Cookies are merged into a single `Cookie` request header, and every `Set-Cookie` header can be saved to a Netscape cookie file that plays the role of a persistent cookie store.
-
-#### 4.1 Set a single cookie manually
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-
-public interface CookieApi {
-
-    // Single cookie: -b / --cookie 'name=value'
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b 'sessionId=abc123'")
-    String withSingleCookie(JQuickCurlReq request);
-}
-
-class SingleCookieDemo {
-    public static void main(String[] args) throws Exception {
-        CookieApi api = JCurlInvoker.createProxy(CookieApi.class);
-        System.out.println(api.withSingleCookie(new JQuickCurlReq()));
-    }
-}
-```
-
-#### 4.2 Set multiple cookies manually
-
-```java
-public interface CookieApi {
-
-    // Multiple cookies: separate them with a semicolon inside one -b option
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
-            "-b 'sessionId=abc123; theme=dark; lang=en'")
-    String withMultipleCookies(JQuickCurlReq request);
-
-    // Equivalent form: set the Cookie header directly with -H
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
-            "-H 'Cookie: sessionId=abc123; theme=dark; lang=en'")
-    String withCookieHeader(JQuickCurlReq request);
-}
-```
-
-Multiple cookies are separated by `;`. Both `-b` and `-H 'Cookie: ...'` end up in the same `Cookie` request header, and repeated names are merged instead of overwritten.
-
-#### 4.3 Carry cookies automatically from a cookie jar file
-
-```java
-public interface CookieApi {
-
-    // Load cookies from a Netscape / Mozilla cookie file: -b @file
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
-    String withJarFile(JQuickCurlReq request);
-}
-```
-
-`-b @cookies.txt` reads a Netscape format cookie file and attaches the cookies to the request automatically, which is how jquick-curl keeps cookies across calls. Note the `@` prefix before the file name.
-
-#### 4.4 Read `Set-Cookie` from the response
-
-Return `JQuickCurlResponseBody` instead of `String` when you need response headers.
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-import com.github.paohaijiao.responseBody.JQuickCurlResponseBody;
-
-import java.util.List;
-
-public interface LoginApi {
-
-    // Return the raw response body object to access headers
-    @JCurlCommand("curl -X GET 'https://httpbin.org/cookies/set?sessionId=abc123'")
-    JQuickCurlResponseBody setCookie(JQuickCurlReq request);
-}
-
-class ReadSetCookieDemo {
-    public static void main(String[] args) throws Exception {
-        LoginApi api = JCurlInvoker.createProxy(LoginApi.class);
-        JQuickCurlResponseBody response = api.setCookie(new JQuickCurlReq());
-
-        // First Set-Cookie header
-        String first = response.header("Set-Cookie");
-        // All Set-Cookie headers (redirects may return several)
-        List<String> all = response.headers("Set-Cookie");
-        // Response payload
-        String body = response.asString();
-
-        System.out.println(first);
-        System.out.println(all);
-        System.out.println(body);
-    }
-}
-```
-
-#### 4.5 Persist cookies and reuse the session
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-import com.github.paohaijiao.responseBody.JQuickCurlResponseBody;
-
-public interface SessionApi {
-
-    // Step 1: sign in and save every Set-Cookie into cookies.txt (-c / --cookie-jar)
-    @JCurlCommand("curl -X POST https://httpbin.org/post " +
-            "-H 'Content-Type: application/json' " +
-            "-d '{\"user\":\"ada\",\"password\":\"secret\"}' " +
-            "-c ./cookies.txt")
-    JQuickCurlResponseBody login(JQuickCurlReq request);
-
-    // Step 2: reuse the persisted cookies on the next request (-b @file)
-    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
-    String profile(JQuickCurlReq request);
-}
-
-class SessionDemo {
-    public static void main(String[] args) throws Exception {
-        SessionApi api = JCurlInvoker.createProxy(SessionApi.class);
-        JQuickCurlReq request = new JQuickCurlReq();
-
-        // Writes ./cookies.txt in Netscape format
-        api.login(request);
-
-        // Cookies from the file are attached automatically
-        System.out.println(api.profile(request));
-    }
-}
-```
-
-`-c` / `--cookie-jar` writes every `Set-Cookie` header to the given file in Netscape format (seven tab-separated columns), and `-b @file` reuses it on later requests, which keeps a login session alive across calls. Never commit a real cookie file to a repository.
-
-## More Examples
-
-### XML configuration
-
-Centralize API definitions in XML so request templates stay out of Java code.
+All request templates live in `apis.xml`: each `<curl>` tag maps to one Java method — `name` is the method name, `returnClass` is the return type, and `#{name}` is a runtime variable.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -259,10 +74,37 @@ Centralize API definitions in XML so request templates stay out of Java code.
         "classpath:paohaijiao/dtd/Jquick-curl.dtd">
 <curls namespace="com.example.UserApi">
     <curl name="getUser" returnClass="java.lang.String">
-        curl -X GET https://api.example.com/users/#{id} -b @./cookies.txt
+        curl -X GET https://api.example.com/users/#{id}
     </curl>
 </curls>
 ```
+
+### 3. Render headers conditionally with &lt;if&gt;
+
+Options inside `<if test="...">` are only spliced into the command when the expression holds:
+
+```xml
+<curl name="getUser" returnClass="java.lang.String">
+    curl -X GET https://api.example.com/users/#{id}
+    <if test="withTrace == true"> -H "X-Trace: #{traceId}" </if>
+</curl>
+```
+
+### 4. Define a JSON POST request
+
+Declare more endpoints in the same XML file, writing curl options exactly as you would on the command line:
+
+```xml
+<curl name="createOrder" returnClass="java.lang.String">
+    curl -X POST https://api.example.com/orders
+    -H "Content-Type: application/json"
+    -d '{"sku":"#{sku}","count":#{count}}'
+</curl>
+```
+
+### 5. Write the plain Java interface and call it
+
+The Java side is just an annotation-free interface plus one factory call; variables are injected through `JQuickCurlReq`:
 
 ```java
 import com.github.paohaijiao.domain.req.JQuickCurlReq;
@@ -273,46 +115,143 @@ import com.github.paohaijiao.xml.handler.JQuickParseHandler;
 
 public interface UserApi {
     String getUser(JQuickCurlReq request);
+    String createOrder(JQuickCurlReq request);
 }
 
-class XmlDemo {
+class Demo {
     public static void main(String[] args) throws Exception {
         JQuickParseHandler parser = new JQuickCurlXmlParseFactory();
         JQuickFactory factory = new JQuickXmlFactory(parser, "apis.xml");
         UserApi api = factory.createApi(UserApi.class);
-        System.out.println(api.getUser(new JQuickCurlReq()));
+
+        JQuickCurlReq request = new JQuickCurlReq();
+        request.put("sku", "A-1001");
+        request.put("count", "2");
+        System.out.println(api.createOrder(request));
     }
 }
 ```
 
-The `<curl name="...">` attribute must match the Java method name, and `#{name}` is the placeholder used by XML proxies.
+The `name` attribute of `<curl name="...">` must match the Java method name; `#{name}` values are read from `JQuickCurlReq`, and `<if>` test expressions are evaluated against the same variables.
 
-### Variable substitution and conditional rendering
+### 6. Read the response body and headers
+
+Declare `returnClass` as `JQuickCurlResponseBody` to access response headers; the body can be read multiple times:
+
+```xml
+<curl name="login" returnClass="com.github.paohaijiao.responseBody.JQuickCurlResponseBody">
+    curl -X POST https://api.example.com/login -c ./cookies.txt
+    -H "Content-Type: application/json"
+    -d '{"user":"#{user}"}'
+</curl>
+```
 
 ```java
-public interface AuthApi {
+JQuickCurlResponseBody resp = api.login(request);
 
-    // ${...} placeholders are resolved from JQuickCurlReq
-    @JCurlCommand("curl -X GET https://api.example.com/me -u ${user}:${password}")
-    String currentUser(JQuickCurlReq request);
+// Response headers and body
+String firstSetCookie = resp.header("Set-Cookie");
+String body = resp.asString();
+```
+
+## Annotation style: @JCurlCommand
+
+If you prefer not to maintain XML, declare commands directly on interface methods and create the client with `JCurlInvoker.createProxy`:
+
+```java
+import com.github.paohaijiao.anno.JCurlCommand;
+import com.github.paohaijiao.domain.req.JQuickCurlReq;
+import com.github.paohaijiao.executor.JCurlInvoker;
+
+public interface UserApi {
+
+    @JCurlCommand("curl -X GET https://httpbin.org/get")
+    String list(JQuickCurlReq request);
+
+    @JCurlCommand("curl -X POST https://httpbin.org/post " +
+            "-H 'Content-Type: application/json' " +
+            "-d '{\"sku\":\"A-1001\",\"count\":2}'")
+    String create(JQuickCurlReq request);
 }
+
+class AnnotationDemo {
+    public static void main(String[] args) throws Exception {
+        UserApi api = JCurlInvoker.createProxy(UserApi.class);
+        System.out.println(api.list(new JQuickCurlReq()));
+    }
+}
+```
+
+The annotation proxy uses `${name}` placeholders, also resolved from `JQuickCurlReq`:
+
+```java
+@JCurlCommand("curl -X GET https://api.example.com/me -u ${user}:${password}")
+String currentUser(JQuickCurlReq request);
 ```
 
 ```java
 JQuickCurlReq request = new JQuickCurlReq();
 request.put("user", "ada");
 request.put("password", System.getenv("API_PASSWORD"));
-String me = JCurlInvoker.createProxy(AuthApi.class).currentUser(request);
 ```
 
-```xml
-<curl name="search" returnClass="java.lang.String">
-    curl -X GET #{host}/search
-    <if test="withTrace == true"> -H "X-Trace: #{traceId}" </if>
-</curl>
+Inject sensitive values through variables instead of hard-coding them in commands.
+
+## Examples
+
+### Cookies and session reuse
+
+jquick-curl implements the cookie options of native curl: `-b` / `--cookie` for sending cookies and `-c` / `--cookie-jar` for persisting them. Cookies are merged into a single `Cookie` request header, and every `Set-Cookie` header can be saved to a Netscape cookie file that plays the role of a persistent cookie store.
+
+```java
+public interface CookieApi {
+
+    // Manual cookies: -b / --cookie, separate multiple cookies with ;
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
+            "-b 'sessionId=abc123; theme=dark; lang=en'")
+    String withCookies(JQuickCurlReq request);
+
+    // Equivalent form: set the Cookie header directly with -H
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies " +
+            "-H 'Cookie: sessionId=abc123; theme=dark; lang=en'")
+    String withCookieHeader(JQuickCurlReq request);
+
+    // Load cookies from a Netscape / Mozilla cookie file: -b @file
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
+    String withJarFile(JQuickCurlReq request);
+}
 ```
 
-`${...}` is used by annotation proxies and `#{...}` by XML proxies. A header inside `<if>` is appended only when the expression is true. Keep credentials in variables instead of hard-coding them in the command.
+Both `-b` and `-H 'Cookie: ...'` end up in the same `Cookie` request header, and repeated names are merged instead of overwritten.
+
+The typical login flow has two steps: sign in and persist the cookies, then reuse them on protected endpoints.
+
+```java
+public interface SessionApi {
+
+    // Step 1: sign in and save every Set-Cookie into cookies.txt (-c / --cookie-jar)
+    @JCurlCommand("curl -X POST https://httpbin.org/post " +
+            "-H 'Content-Type: application/json' " +
+            "-d '{\"user\":\"ada\",\"password\":\"secret\"}' " +
+            "-c ./cookies.txt")
+    JQuickCurlResponseBody login(JQuickCurlReq request);
+
+    // Step 2: the next request carries the file cookies automatically (-b @file)
+    @JCurlCommand("curl -X GET https://httpbin.org/cookies -b @./cookies.txt")
+    String profile(JQuickCurlReq request);
+}
+
+class SessionDemo {
+    public static void main(String[] args) throws Exception {
+        SessionApi api = JCurlInvoker.createProxy(SessionApi.class);
+        JQuickCurlReq request = new JQuickCurlReq();
+        api.login(request);
+        System.out.println(api.profile(request));
+    }
+}
+```
+
+`-c` / `--cookie-jar` writes every `Set-Cookie` in Netscape format (seven tab-separated columns). Never commit real cookie files to your repository.
 
 ### File upload and download
 
@@ -334,7 +273,7 @@ public interface FileApi {
 }
 ```
 
-`-F` accepts several files and can mix them with regular form fields. `--output` writes the response to disk inside the executor; alternatively declare a `byte[]` return type and save the bytes in your own code.
+`-F` supports multiple files and can be mixed with plain form fields; `--output` writes to disk inside the executor, or declare a `byte[]` return type and handle the bytes yourself. All of these commands can also live inside a `<curl>` tag in XML.
 
 ### Batch execution
 
@@ -368,9 +307,9 @@ class BatchDemo {
 }
 ```
 
-Batch execution scans every public method annotated with `@JCurlCommand` and invokes them in order.
+Batch execution scans the target class for every public method annotated with `@JCurlCommand` and invokes them in order.
 
-### Timeouts, connection pool and interceptors
+### Timeouts, connection pooling and interceptors
 
 ```java
 import com.github.paohaijiao.config.JQuickCurlConfig;
@@ -388,7 +327,7 @@ JQuickCurlConfig.getInstance()
 ```
 
 ```java
-// Add a global interceptor, for example a Bearer token
+// A global interceptor, for example a Bearer token
 Interceptor auth = chain -> chain.proceed(
         chain.request().newBuilder()
                 .addHeader("Authorization", "Bearer " + System.getenv("API_TOKEN"))
@@ -397,14 +336,14 @@ Interceptor auth = chain -> chain.proceed(
 JQuickCurlConfig.getInstance().addInterceptor(auth);
 ```
 
-`JQuickCurlConfig` is a global singleton that manages timeouts, the connection pool, retries, redirects and interceptors. A single method can override its timeouts with `@JTimeout`.
+`JQuickCurlConfig` is a global singleton that manages timeouts, the connection pool, retries, redirects and interceptors; a single method can override its timeout with `@JTimeout`.
 
-### Implemented curl options
+## Supported curl options
 
-| Category | Supported format | Purpose |
+| Category | Supported syntax | Purpose |
 | --- | --- | --- |
-| Request method | `-X <METHOD>`, `--request <METHOD>` | Select the HTTP method |
-| Headers | `-H 'Name: value'`, `--header 'Name: value'` | Add a request header |
+| HTTP method | `-X <METHOD>`, `--request <METHOD>` | Set the HTTP method |
+| Headers | `-H 'Name: value'`, `--header 'Name: value'` | Add request headers |
 | Cookies | `-b 'name=value'`, `--cookie`, `-b @file` | Send cookies or load a cookie file |
 | Cookie jar | `-c <file>`, `--cookie-jar <file>` | Persist `Set-Cookie` values to a file |
 | Request data | `-d`, `--data`, `--data-ascii`, `--data-binary`, `--data-raw` | Send a request body |
@@ -437,4 +376,4 @@ Contributions of any kind are welcome.
 
 ## License
 
-jquick-curl is released under the [Apache License 2.0](./LICENSE). When using, modifying or distributing the project, comply with the license terms, including copyright, patent and notice requirements.
+jquick-curl is open source under the [Apache License 2.0](./LICENSE). When using, modifying or distributing this project, follow the license terms, including copyright, patent and attribution requirements.

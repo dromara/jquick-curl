@@ -28,21 +28,22 @@
   <a href="./README.md">English</a> | <b>简体中文</b>
 </p>
 
-**jquick-curl** 是一款面向 Java 的轻量 HTTP 客户端。用一条熟悉的 curl 命令描述请求，把它写在注解或 XML 里，就能像调用普通 Java 方法一样发起调用：自研命令解析器负责把命令翻译成请求，带连接池的高性能传输层负责执行，业务代码里没有手写的请求构建逻辑。jquick-curl 是 JQuick 生态的子项目，由 [Dromara](https://github.com/dromara/jquick-curl) 开源社区维护。
+**jquick-curl** 是一款面向 Java 的轻量 HTTP 客户端。把请求写成一条熟悉的 curl 命令，集中维护在 XML 里，Java 侧只保留一个零注解的接口：自研命令解析器负责把命令翻译成请求，带连接池的高性能传输层负责执行，业务代码里没有手写的请求构建逻辑。jquick-curl 是 JQuick 生态的子项目，由 [Dromara](https://github.com/dromara/jquick-curl) 开源社区维护。
 
 ⭐ 本项目已被 [Awesome Java](https://github.com/akullpp/awesome-java) 列表收录。
 
 <p align="center">
-  <img src="src/main/resources/static/jquick-curl-demo.svg" width="880" alt="jquick-curl 演示：引入依赖 → GET 请求 → 自定义请求头 → JSON POST → 响应报文 → XML 配置" />
+  <img src="src/main/resources/static/jquick-curl-demo.svg" width="880" alt="jquick-curl 演示：XML 配置 curl 命令 → 变量替换 → if 条件渲染 → JSON POST → 响应报文 → 零注解调用" />
 </p>
 
 ## 特性
 
-- **原生 curl 风格 API** —— 用 curl 命令描述请求，用 Java 方法调用，后端开发者零学习成本。
-- **注解与 XML 双配置** —— 使用 `@JCurlCommand` 声明请求，或集中维护在 `apis.xml` 中。
-- **动态代理客户端** —— `JCurlInvoker.createProxy(UserApi.class)` 把接口变成可用的客户端。
-- **变量替换** —— 运行时从请求中解析 `${name}` / `#{name}` 占位符。
-- **条件渲染** —— 仅当 XML 中的 `<if test="...">` 表达式成立时，才拼入对应的 header 或选项。
+- **XML 集中配置** —— 请求模板全部写在 `apis.xml`，改配置不改 Java 代码。
+- **原生 curl 风格** —— 用 curl 命令描述请求，后端开发者零学习成本。
+- **零注解接口** —— Java 侧只有普通接口，`factory.createApi(UserApi.class)` 一行变成客户端。
+- **变量替换** —— 运行时解析 `#{name}` / `${name}` 占位符。
+- **条件渲染** —— `<if test="...">` 表达式成立时才拼入对应的 header 或选项。
+- **注解方式可选** —— 也可以用 `@JCurlCommand` 把命令直接写在接口方法上。
 - **Cookie 支持** —— 手动设置 cookie、基于文件的 cookie 存储、`Set-Cookie` 持久化。
 - **全量 HTTP 方法** —— `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`HEAD`、`OPTIONS`、`TRACE`。
 - **文件传输** —— 通过 `-F` 做 multipart 上传，通过 `-o` / `--output` 下载。
@@ -63,101 +64,9 @@
 </dependency>
 ```
 
-### 2. 发起 GET 请求
+### 2. 在 XML 中定义 GET 请求
 
-在接口方法上声明 curl 命令，创建代理后直接调用。
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-
-public class Demo {
-
-    interface UserApi {
-
-        // GET 请求：返回体直接映射为 String
-        @JCurlCommand("curl -X GET https://httpbin.org/get")
-        String list(JQuickCurlReq request);
-    }
-
-    public static void main(String[] args) throws Exception {
-        UserApi api = JCurlInvoker.createProxy(UserApi.class);
-        String body = api.list(new JQuickCurlReq());
-        System.out.println(body);
-    }
-}
-```
-
-### 3. 追加自定义请求头
-
-curl 的选项可以原样拼进命令字符串，例如 `-H` 追加请求头：
-
-```java
-public interface UserApi {
-
-    @JCurlCommand("curl -X GET https://httpbin.org/get " +
-            "-H 'X-Request-Id: 8f2c1d'")
-    String list(JQuickCurlReq request);
-}
-```
-
-### 4. 发送 JSON POST 请求
-
-`-H` 指定 `Content-Type`，`-d` 携带 JSON 报文：
-
-```java
-public interface OrderApi {
-
-    @JCurlCommand("curl -X POST https://httpbin.org/post " +
-            "-H 'Content-Type: application/json' " +
-            "-d '{\"sku\":\"A-1001\",\"count\":2}'")
-    String create(JQuickCurlReq request);
-}
-
-class PostDemo {
-    public static void main(String[] args) throws Exception {
-        OrderApi api = JCurlInvoker.createProxy(OrderApi.class);
-        System.out.println(api.create(new JQuickCurlReq()));
-    }
-}
-```
-
-### 5. 读取响应报文与响应头
-
-需要读取响应头或复用响应体时，把返回类型声明为 `JQuickCurlResponseBody`，响应可以多次读取：
-
-```java
-import com.github.paohaijiao.anno.JCurlCommand;
-import com.github.paohaijiao.domain.req.JQuickCurlReq;
-import com.github.paohaijiao.executor.JCurlInvoker;
-import com.github.paohaijiao.responseBody.JQuickCurlResponseBody;
-
-public class RespDemo {
-
-    interface LoginApi {
-
-        @JCurlCommand("curl -X GET 'https://httpbin.org/cookies/set?sessionId=abc123'")
-        JQuickCurlResponseBody setCookie(JQuickCurlReq request);
-    }
-
-    public static void main(String[] args) throws Exception {
-        LoginApi api = JCurlInvoker.createProxy(LoginApi.class);
-        JQuickCurlResponseBody response = api.setCookie(new JQuickCurlReq());
-
-        // 响应头与响应体
-        String first = response.header("Set-Cookie");
-        String body = response.asString();
-
-        System.out.println(first);
-        System.out.println(body);
-    }
-}
-```
-
-### 6. XML 配置方式
-
-把接口定义集中到 `apis.xml`，让请求模板与 Java 业务代码彻底分离：
+请求模板集中在 `apis.xml`：一个 `<curl>` 标签对应一个 Java 方法，`name` 是方法名，`returnClass` 是返回类型，`#{name}` 是运行时变量。
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -165,10 +74,37 @@ public class RespDemo {
         "classpath:paohaijiao/dtd/Jquick-curl.dtd">
 <curls namespace="com.example.UserApi">
     <curl name="getUser" returnClass="java.lang.String">
-        curl -X GET https://api.example.com/users/#{id} -b @./cookies.txt
+        curl -X GET https://api.example.com/users/#{id}
     </curl>
 </curls>
 ```
+
+### 3. 用 &lt;if&gt; 条件渲染请求头
+
+`<if test="...">` 表达式成立时，其中的选项才会拼入命令：
+
+```xml
+<curl name="getUser" returnClass="java.lang.String">
+    curl -X GET https://api.example.com/users/#{id}
+    <if test="withTrace == true"> -H "X-Trace: #{traceId}" </if>
+</curl>
+```
+
+### 4. 定义 JSON POST 请求
+
+同一个 XML 里可以继续声明更多接口，curl 选项原样书写：
+
+```xml
+<curl name="createOrder" returnClass="java.lang.String">
+    curl -X POST https://api.example.com/orders
+    -H "Content-Type: application/json"
+    -d '{"sku":"#{sku}","count":#{count}}'
+</curl>
+```
+
+### 5. 编写 Java 接口并发起调用
+
+Java 侧只有一个零注解的接口和一行工厂调用，变量通过 `JQuickCurlReq` 注入：
 
 ```java
 import com.github.paohaijiao.domain.req.JQuickCurlReq;
@@ -179,19 +115,87 @@ import com.github.paohaijiao.xml.handler.JQuickParseHandler;
 
 public interface UserApi {
     String getUser(JQuickCurlReq request);
+    String createOrder(JQuickCurlReq request);
 }
 
-class XmlDemo {
+class Demo {
     public static void main(String[] args) throws Exception {
         JQuickParseHandler parser = new JQuickCurlXmlParseFactory();
         JQuickFactory factory = new JQuickXmlFactory(parser, "apis.xml");
         UserApi api = factory.createApi(UserApi.class);
-        System.out.println(api.getUser(new JQuickCurlReq()));
+
+        JQuickCurlReq request = new JQuickCurlReq();
+        request.put("sku", "A-1001");
+        request.put("count", "2");
+        System.out.println(api.createOrder(request));
     }
 }
 ```
 
-`<curl name="...">` 的属性值必须与 Java 方法名一致，`#{name}` 是 XML 代理使用的变量占位符。
+`<curl name="...">` 的属性值必须与 Java 方法名一致；`#{name}` 从 `JQuickCurlReq` 中取值，`<if>` 的 test 表达式同样基于这些变量求值。
+
+### 6. 读取响应报文与响应头
+
+把 `returnClass` 声明为 `JQuickCurlResponseBody`，即可读取响应头，响应体可以多次读取：
+
+```xml
+<curl name="login" returnClass="com.github.paohaijiao.responseBody.JQuickCurlResponseBody">
+    curl -X POST https://api.example.com/login -c ./cookies.txt
+    -H "Content-Type: application/json"
+    -d '{"user":"#{user}"}'
+</curl>
+```
+
+```java
+JQuickCurlResponseBody resp = api.login(request);
+
+// 响应头与响应体
+String firstSetCookie = resp.header("Set-Cookie");
+String body = resp.asString();
+```
+
+## 注解方式：@JCurlCommand
+
+不想维护 XML 时，也可以把命令直接写在接口方法上，用 `JCurlInvoker.createProxy` 创建代理：
+
+```java
+import com.github.paohaijiao.anno.JCurlCommand;
+import com.github.paohaijiao.domain.req.JQuickCurlReq;
+import com.github.paohaijiao.executor.JCurlInvoker;
+
+public interface UserApi {
+
+    @JCurlCommand("curl -X GET https://httpbin.org/get")
+    String list(JQuickCurlReq request);
+
+    @JCurlCommand("curl -X POST https://httpbin.org/post " +
+            "-H 'Content-Type: application/json' " +
+            "-d '{\"sku\":\"A-1001\",\"count\":2}'")
+    String create(JQuickCurlReq request);
+}
+
+class AnnotationDemo {
+    public static void main(String[] args) throws Exception {
+        UserApi api = JCurlInvoker.createProxy(UserApi.class);
+        System.out.println(api.list(new JQuickCurlReq()));
+    }
+}
+```
+
+注解代理使用 `${name}` 占位符，同样从 `JQuickCurlReq` 取值：
+
+```java
+@JCurlCommand("curl -X GET https://api.example.com/me -u ${user}:${password}")
+String currentUser(JQuickCurlReq request);
+```
+
+```java
+JQuickCurlReq request = new JQuickCurlReq();
+request.put("user", "ada");
+request.put("password", System.getenv("API_PASSWORD"));
+```
+
+敏感信息请通过变量注入，不要硬编码在命令里。
 
 ## 场景示例
 
@@ -249,33 +253,6 @@ class SessionDemo {
 
 `-c` / `--cookie-jar` 会把每个 `Set-Cookie` 以 Netscape 格式（制表符分隔的 7 列）写入指定文件。请勿把真实的 cookie 文件提交到代码仓库。
 
-### 变量替换与条件渲染
-
-```java
-public interface AuthApi {
-
-    // ${...} 占位符由 JQuickCurlReq 在运行时解析
-    @JCurlCommand("curl -X GET https://api.example.com/me -u ${user}:${password}")
-    String currentUser(JQuickCurlReq request);
-}
-```
-
-```java
-JQuickCurlReq request = new JQuickCurlReq();
-request.put("user", "ada");
-request.put("password", System.getenv("API_PASSWORD"));
-String me = JCurlInvoker.createProxy(AuthApi.class).currentUser(request);
-```
-
-```xml
-<curl name="search" returnClass="java.lang.String">
-    curl -X GET #{host}/search
-    <if test="withTrace == true"> -H "X-Trace: #{traceId}" </if>
-</curl>
-```
-
-`${...}` 用于注解代理，`#{...}` 用于 XML 代理；`<if>` 中的 header 只在表达式成立时才会拼入命令。敏感信息请通过变量注入，不要硬编码在命令里。
-
 ### 文件上传与下载
 
 ```java
@@ -296,7 +273,7 @@ public interface FileApi {
 }
 ```
 
-`-F` 支持同时上传多个文件，并可与普通表单字段混用；`--output` 由执行器直接写入磁盘，也可以声明 `byte[]` 返回类型后在业务代码中自行保存。
+`-F` 支持同时上传多个文件，并可与普通表单字段混用；`--output` 由执行器直接写入磁盘，也可以声明 `byte[]` 返回类型后在业务代码中自行保存。以上命令同样可以写在 XML 的 `<curl>` 标签里。
 
 ### 批量执行
 
