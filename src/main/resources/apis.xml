@@ -19,6 +19,11 @@
         -H "Content-Type: application/json" \
         -d '{"name":"John Doe","email":"john@example.com"}'
     </curl>
+    <curl name="page" returnClass="com.github.paohaijiao.test.model.JUser">
+        curl -X POST http://localhost:8080/api/users/page \
+        -H "Content-Type: application/json" \
+        -d '{"pageNum":1,"pageSize":2}'
+    </curl>
     <curl name="usersByVariable" returnClass="com.github.paohaijiao.test.model.JUser">
         curl -X POST http://localhost:8080/api/users/createUser \
         -H "Content-Type: application/json" \
@@ -57,19 +62,19 @@
 
     <curl name="upload" returnClass="java.lang.String">
         curl -X POST http://localhost:8080/api/users/upload \
-        -F "file=@D:\test\pie.xlsx"
+        -F "file=@D:\test\pie.txt"
     </curl>
 
     <curl name="upload1" returnClass="java.lang.String">
         curl -X POST http://localhost:8080/api/users/upload-multiple \
-        -F "files=@D:\test\pie.xlsx" \
-        -F "files=@D:\test\pie2.xlsx"
+        -F "files=@D:\test\pie.txt" \
+        -F "files=@D:\test\pie2.txt"
     </curl>
 
     <curl name="download" returnClass="byte[]">
         curl -X GET http://localhost:8080/api/users/download/pie.xlsx \
         -H "Content-Type: application/octet-stream" \
-        --output 'd://test//piett.xlsx'
+        --output 'd://test//pie.txt'
     </curl>
 
     <curl name="uploadWithPostParams" returnClass="java.lang.String">

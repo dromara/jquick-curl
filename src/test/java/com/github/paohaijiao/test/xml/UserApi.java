@@ -5,6 +5,7 @@ import com.github.paohaijiao.domain.req.JQuickCurlReq;
 import com.github.paohaijiao.model.JResult;
 import com.github.paohaijiao.test.model.JUser;
 import com.github.paohaijiao.test.xml.model.CreateResult;
+import com.github.paohaijiao.test.xml.model.Page;
 import com.github.paohaijiao.test.xml.model.User;
 import com.github.paohaijiao.xml.param.Param;
 
@@ -19,6 +20,8 @@ public interface UserApi {
     JUser getUserByIdVariable(@Param("host")String host,@Param("a") int a);
 
     JUser users(JQuickCurlReq req);
+
+    Page<JUser> page(JQuickCurlReq req);
 
     JUser usersByVariable(@Param("name")String name,@Param("email")String email);
 

@@ -87,6 +87,19 @@ public class CurlApiExample {
         System.out.println(userApi.users(req));
     }
     @Test
+    public  void page() throws Exception {
+        JQuickCurlReq req = new JQuickCurlReq();
+        req.put("pageNum", 1);
+        req.put("pageSize", 2);
+        JQuickParseHandler parser = new JQuickCurlXmlParseFactory();
+        JQuickFactory factory = new JQuickXmlFactory(parser,"apis.xml");
+        UserApi userApi = factory.createApi(UserApi.class);
+        System.out.println(factory);
+        System.out.println(userApi.page(req));
+    }
+
+
+    @Test
     public  void usersPut() throws Exception {
         JQuickCurlReq req = new JQuickCurlReq();
         req.put("user", "xsaxsa@qq.com");
@@ -173,7 +186,7 @@ public class CurlApiExample {
         JQuickFactory factory = new JQuickXmlFactory(parser,"apis.xml");
         UserApi userApi = factory.createApi(UserApi.class);
         byte[] r=userApi.download(req);
-        Path path = Paths.get("d://test/pief.xlsx");
+        Path path = Paths.get("d://test/pief.txt");
         Files.write(path, r, StandardOpenOption.CREATE);
     }
     @Test
