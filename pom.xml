@@ -4,9 +4,9 @@
     <parent>
         <groupId>io.github.paohaijiao</groupId>
         <artifactId>javelin</artifactId>
-        <version>2.8.0</version>
+        <version>2.8.1</version>
     </parent>
-    <version>2.9.0</version>
+    <version>2.9.1</version>
     <artifactId>jquick-curl</artifactId>
     <name>jquick-curl</name>
     <properties>
@@ -24,14 +24,8 @@
         <druid.version>1.1.4</druid.version>
         <yaml.version>2.4</yaml.version>
         <junit.version>4.11</junit.version>
-
-        <poi.version>5.2.3</poi.version>
-        <batik.version>1.12</batik.version>
-        <itext.svg.version>7.2.5</itext.svg.version>
-        <itext.version>7.2.5</itext.version>
         <gson.version>2.8.0</gson.version>
         <slf4j-api.version>2.0.9</slf4j-api.version>
-        <jfree.svg.version>5.0.3</jfree.svg.version>
         <antlr4.version>4.13.2</antlr4.version>
     </properties>
     <dependencies>
@@ -48,7 +42,7 @@
         <dependency>
             <groupId>io.github.paohaijiao</groupId>
             <artifactId>jquick-xmlProxy</artifactId>
-            <version>1.7.0</version>
+            <version>1.8.0</version>
         </dependency>
         <dependency>
             <groupId>io.github.paohaijiao</groupId>
