@@ -199,6 +199,56 @@ Inject sensitive values through variables instead of hard-coding them in command
 
 ## Examples
 
+### Generic return types (pagination)
+
+A method can declare a generic return type such as `Page<User>`. In XML, `returnClass` names the element type of the page, while the Java signature supplies the wrapper:
+
+```xml
+<curl name="page" returnClass="com.example.model.User">
+    curl -X POST https://api.example.com/users/page \
+    -H "Content-Type: application/json" \
+    -d '{"pageNum":#{pageNum},"pageSize":#{pageSize}}'
+</curl>
+```
+
+```java
+public interface UserApi {
+    Page<User> page(JQuickCurlReq request);
+}
+```
+
+`Page<T>` is a plain generic container whose `records` hold the data for the current page:
+
+```java
+public class Page<T> {
+
+    private long pageNum;
+    private long pageSize;
+    private long total;
+    private List<T> records;
+
+    // getters / setters
+}
+```
+
+`#{pageNum}` and `#{pageSize}` are injected through `JQuickCurlReq`, and the caller receives a `Page<User>`:
+
+```java
+JQuickCurlReq request = new JQuickCurlReq();
+request.put("pageNum", 1);
+request.put("pageSize", 2);
+
+JQuickParseHandler parser = new JQuickCurlXmlParseFactory();
+JQuickFactory factory = new JQuickXmlFactory(parser, "apis.xml");
+UserApi api = factory.createApi(UserApi.class);
+
+Page<User> page = api.page(request);
+List<User> records = page.getRecords();
+
+System.out.println(page.getTotal() + " users, page " + page.getPageNum());
+System.out.println(records);
+```
+
 ### Cookies and session reuse
 
 jquick-curl implements the cookie options of native curl: `-b` / `--cookie` for sending cookies and `-c` / `--cookie-jar` for persisting them. Cookies are merged into a single `Cookie` request header, and every `Set-Cookie` header can be saved to a Netscape cookie file that plays the role of a persistent cookie store.

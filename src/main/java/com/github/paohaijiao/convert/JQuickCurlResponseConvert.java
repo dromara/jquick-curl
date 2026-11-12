@@ -44,7 +44,7 @@ public class JQuickCurlResponseConvert {
             return raw.asString();
         }
         JQuickValueTransformer transformer=new JQuickValueTransformer();
-        JQuickJavaTypeReference reference=JQuickJavaTypeReference.of(method.getReturnType());
+        JQuickJavaTypeReference reference=JQuickJavaTypeReference.of(method.getGenericReturnType());
         return transformer.transform(raw.asString(),reference);
     }
 }

@@ -199,6 +199,56 @@ request.put("password", System.getenv("API_PASSWORD"));
 
 ## 场景示例
 
+### 泛型返回（分页）
+
+接口的返回类型可以直接声明泛型，例如分页结果 `Page<User>`。XML 中的 `returnClass` 填写当前页记录的元素类型，外层容器由 Java 方法签名表达：
+
+```xml
+<curl name="page" returnClass="com.example.model.User">
+    curl -X POST https://api.example.com/users/page \
+    -H "Content-Type: application/json" \
+    -d '{"pageNum":#{pageNum},"pageSize":#{pageSize}}'
+</curl>
+```
+
+```java
+public interface UserApi {
+    Page<User> page(JQuickCurlReq request);
+}
+```
+
+`Page<T>` 是普通的泛型容器，`records` 持有当前页的数据：
+
+```java
+public class Page<T> {
+
+    private long pageNum;
+    private long pageSize;
+    private long total;
+    private List<T> records;
+
+    // getters / setters
+}
+```
+
+`#{pageNum}` 与 `#{pageSize}` 通过 `JQuickCurlReq` 注入，调用方按 `Page<User>` 接收结果：
+
+```java
+JQuickCurlReq request = new JQuickCurlReq();
+request.put("pageNum", 1);
+request.put("pageSize", 2);
+
+JQuickParseHandler parser = new JQuickCurlXmlParseFactory();
+JQuickFactory factory = new JQuickXmlFactory(parser, "apis.xml");
+UserApi api = factory.createApi(UserApi.class);
+
+Page<User> page = api.page(request);
+List<User> records = page.getRecords();
+
+System.out.println(page.getTotal() + " users, page " + page.getPageNum());
+System.out.println(records);
+```
+
 ### Cookie 与会话保持
 
 jquick-curl 实现了原生 curl 的 cookie 选项：`-b` / `--cookie` 发送 cookie，`-c` / `--cookie-jar` 持久化 cookie。所有 cookie 会合并进同一个 `Cookie` 请求头，响应中的每个 `Set-Cookie` 都可以写入 Netscape 格式的 cookie 文件，该文件即充当持久化的 cookie 存储（CookieStore）。
